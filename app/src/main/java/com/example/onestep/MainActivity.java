@@ -26,6 +26,10 @@ import android.widget.Toast;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import android.speech.tts.TextToSpeech;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -45,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
     private Handler handler;
 
     private boolean isProcessingFrame = false;
+
+    private TextToSpeech tts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) { //1.액티비티 초기화 및 권한 요청
@@ -69,6 +75,15 @@ public class MainActivity extends AppCompatActivity {
             requestPermissions(new String[]{CAMERA_PERMISSION},
                     PERMISSION_REQUEST_CODE);
         }
+
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() { // 음성 인식 안내 객체 초기화
+            @Override
+            public void onInit(int status) {
+                if(status!=android.speech.tts.TextToSpeech.ERROR) {
+                    tts.setLanguage(Locale.KOREAN);
+                }
+            }
+        });
     }
 
     protected synchronized void onDestroy() {
@@ -217,12 +232,52 @@ public class MainActivity extends AppCompatActivity {
                     String resultStr = String.format(Locale.ENGLISH,
                             "class : %s, prob : %.2f%%",
                             output.first, output.second * 100);
+
+                    String blocksResult = String.format(Locale.ENGLISH, "%s", output.first);
+
+                    // 결과 화면 출력
                     textView.setText(resultStr);
+
+                    // 음성 안내 기능
+                    TextToSpeech(blocksResult);
                 });
             }
             image.close();
             isProcessingFrame = false;
         });
+    }
+
+    protected void TextToSpeech(String blocksResult) { //음성 안내 기능
+
+        if(blocksResult.equals("0 normal")) {
+            String textOne = "정상 점자블록입니다.";
+            tts.setPitch(1.0f); // 높낮이
+            tts.setSpeechRate(1.0f); // 빠르기
+            tts.speak(textOne, TextToSpeech.QUEUE_FLUSH, null);
+        }
+
+        if(blocksResult.equals("1 damage")) {
+            String textTwo = "훼손된 점자블록입니다.";
+            tts.setPitch(1.0f); // 높낮이
+            tts.setSpeechRate(1.0f); // 빠르기
+            tts.speak(textTwo, TextToSpeech.QUEUE_FLUSH, null);
+        }
+
+        if(blocksResult.equals("2 obstacle")) {
+            String textThree = "앞에 장애물이 있습니다.";
+            tts.setPitch(1.0f); // 높낮이
+            tts.setSpeechRate(1.0f); // 빠르기
+            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
+        }
+    }
+
+    public void onDestory() {
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+            tts = null;
+        }
+        super.onDestroy();
     }
 
     protected synchronized void runInBackground(final Runnable r) {
