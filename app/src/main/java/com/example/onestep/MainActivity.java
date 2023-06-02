@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String CAMERA_PERMISSION = Manifest.permission.CAMERA;
     private static final int PERMISSION_REQUEST_CODE = 1;
+    private static final int REQUEST_PERMISSION_LOCATION = 2;
 
     private TextView textView;
     private Classifier cls;
@@ -75,7 +76,8 @@ public class MainActivity extends AppCompatActivity {
 
         if(checkSelfPermission(CAMERA_PERMISSION)
                 == PackageManager.PERMISSION_GRANTED) {
-            setFragment();
+            requestLocationPermissions();
+            //setFragment();
         } else {
             requestPermissions(new String[]{CAMERA_PERMISSION},
                     PERMISSION_REQUEST_CODE);
@@ -89,6 +91,21 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void requestLocationPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // 안드로이드 6.0 이상일 경우 런타임 권한 요청
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
+            } else {
+                // 위치 권한이 이미 허용된 경우 처리
+                setFragment();
+            }
+        } else {
+            // 안드로이드 6.0 미만일 경우 위치 권한이 자동으로 부여되므로 처리
+            setFragment();
+        }
     }
 
     protected synchronized void onDestroy() {
@@ -129,11 +146,28 @@ public class MainActivity extends AppCompatActivity {
 
     public void onRequestPermissionsResult( //2.권한 요청 결과에 따른 콜백 함수
             int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if(requestCode == PERMISSION_REQUEST_CODE) {
+        /*if(requestCode == PERMISSION_REQUEST_CODE) {
             if(grantResults.length > 0 && allPermissionsGranted(grantResults)) {
                 setFragment();
             } else {
                 Toast.makeText(this, "permission denied", Toast.LENGTH_LONG).show();
+            }
+        }*/
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && allPermissionsGranted(grantResults)) {
+                // 카메라 권한이 허용된 경우 위치 권한을 요청
+                requestLocationPermissions();
+            } else {
+                // 카메라 권한이 거부된 경우 처리
+                Toast.makeText(this, "카메라 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == REQUEST_PERMISSION_LOCATION) {
+            if (grantResults.length > 0 && allPermissionsGranted(grantResults)) {
+                // 위치 권한이 허용된 경우 위치 업데이트를 시작
+                setFragment();
+            } else {
+                // 위치 권한이 거부된 경우 처리
+                Toast.makeText(this, "위치 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
             }
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);

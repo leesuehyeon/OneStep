@@ -23,7 +23,13 @@ import kotlin.properties.Delegates
 class LocationActivity : AppCompatActivity() {
     private var mFusedLocationProviderClient: FusedLocationProviderClient? = null // 현재 위치를 가져오기 위한 변수
     lateinit var mLastLocation: Location // 위치 값을 가지고 있는 객체
+    //solution2
+    /*var mLocationRequest = LocationRequest.create().apply {
+        priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+    }*/
     private val REQUEST_PERMISSION_LOCATION = 10
+
+    private var previousLocation: Location? = null
 
     //lateinit var button: Button
     /*lateinit var text1: TextView
@@ -47,6 +53,7 @@ class LocationActivity : AppCompatActivity() {
         }*/
     }
 
+    //solution1
     fun startLocationUpdates(context: Context) {
         //FusedLocationProviderClient의 인스턴스를 생성.
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
@@ -63,6 +70,27 @@ class LocationActivity : AppCompatActivity() {
             }
     }
 
+    //solution2
+    /*fun startLocationUpdates(context: Context) {
+        //FusedLocationProviderClient의 인스턴스를 생성.
+        mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
+        if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        // 기기의 위치에 관한 정기 업데이트를 요청하는 메서드 실행
+        // 지정한 루퍼 스레드(Looper.myLooper())에서 콜백(mLocationCallback)으로 위치 업데이트를 요청
+        val mLocationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                // 시스템에서 받은 location 정보를 onLocationChanged()에 전달
+                locationResult.lastLocation
+                onLocationChanged(context, locationResult.lastLocation)
+            }
+        }
+
+        mFusedLocationProviderClient!!.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper())
+    }*/
+
     // 시스템으로 부터 받은 위치정보를 화면에 갱신해주는 메소드
     fun onLocationChanged(context: Context, location: Location) {
         mLastLocation = location
@@ -78,8 +106,15 @@ class LocationActivity : AppCompatActivity() {
         Log.v("address_1", latitude.toString())
         Log.v("address_2", longitude.toString())
         Log.v("address_3", address_s)
-    }
 
+        if (previousLocation != null && locationChanged(previousLocation!!, mLastLocation)) {
+            Log.v("address_4", latitude.toString())
+            Log.v("address_5", longitude.toString())
+            Log.v("address_6", address_s)
+        }
+
+        previousLocation = mLastLocation
+    }
 
     // 위치 권한이 있는지 확인하는 메서드
     fun checkPermissionForLocation(context: Context): Boolean {
@@ -98,7 +133,7 @@ class LocationActivity : AppCompatActivity() {
     }
 
     // 사용자에게 권한 요청 후 결과에 대한 처리 로직
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    /*override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_PERMISSION_LOCATION) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -108,7 +143,7 @@ class LocationActivity : AppCompatActivity() {
                 Toast.makeText(MainActivity@this, "권한이 없어 해당 기능을 실행할 수 없습니다.", Toast.LENGTH_SHORT).show()
             }
         }
-    }
+    }*/
 
     data class AddressData(
         val addressLine: String?
@@ -130,5 +165,11 @@ class LocationActivity : AppCompatActivity() {
             e.printStackTrace()
             getAddress(context, location)
         }
+    }
+
+    fun locationChanged(previousLocation: Location, currentLocation: Location): Boolean {
+        val distanceThreshold = 0.5
+        val distance = previousLocation.distanceTo(currentLocation)
+        return distance >= distanceThreshold
     }
 }
