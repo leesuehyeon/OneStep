@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace 'com.example.onestep'
     compileSdk 33
 
     defaultConfig {
@@ -32,14 +33,20 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.core:core-ktx:1.7.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
+    //implementation 'com.google.android.material:material:1.5.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
+    //위치 관련 라이브러리 추가
     implementation 'com.google.android.gms:play-services-location:18.0.0'
     implementation 'com.google.android.gms:play-services-maps:17.0.0'
+
+    //텐서플로 라이트와 텐서플로 라이트 서포트 라이브러리 의존성 추가
+    implementation 'org.tensorflow:tensorflow-lite:2.4.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.1.0'
 }
