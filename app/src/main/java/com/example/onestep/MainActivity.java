@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.hardware.camera2.CameraAccessException;
@@ -16,9 +17,11 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.util.Log;
+import android.os.Vibrator;
+import android.provider.MediaStore;
 import android.util.Pair;
 import android.util.Size;
 import android.view.Surface;
@@ -26,6 +29,8 @@ import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.Timer;
@@ -59,12 +64,14 @@ public class MainActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
-    protected void onCreate(Bundle savedInstanceState) { //1.액티비티 초기화 및 권한 요청
+    protected void onCreate(Bundle savedInstanceState) { //액티비티 초기화 및 권한 요청
         super.onCreate(null);
         setContentView(R.layout.activity_main);
 
+        //액티비티가 실행되는 동안 화면이 꺼지지 않고 계속 켜져 있도록 설정
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        //모델 추론 결과 값을 출력할 텍스트뷰 연결
         textView = findViewById(R.id.textView);
 
         cls = new Classifier(this);
@@ -74,16 +81,15 @@ public class MainActivity extends AppCompatActivity {
             ioe.printStackTrace();
         }
 
-        if(checkSelfPermission(CAMERA_PERMISSION)
+        if(checkSelfPermission(CAMERA_PERMISSION) //권한 부여 확인
                 == PackageManager.PERMISSION_GRANTED) {
             requestLocationPermissions();
-            //setFragment();
         } else {
             requestPermissions(new String[]{CAMERA_PERMISSION},
                     PERMISSION_REQUEST_CODE);
         }
 
-        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() { // 음성 인식 안내 객체 초기화
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() { //음성 안내 기능
             @Override
             public void onInit(int status) {
                 if(status!=android.speech.tts.TextToSpeech.ERROR) {
@@ -95,20 +101,26 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestLocationPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // 안드로이드 6.0 이상일 경우 런타임 권한 요청
+            //안드로이드 6.0 이상일 경우 런타임 권한 요청
             if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
             } else {
-                // 위치 권한이 이미 허용된 경우 처리
-                setFragment();
+                //위치 권한이 이미 허용된 경우 처리
+                setFragment(); //프래그먼트 생성
             }
         } else {
-            // 안드로이드 6.0 미만일 경우 위치 권한이 자동으로 부여되므로 처리
-            setFragment();
+            //안드로이드 6.0 미만일 경우 위치 권한이 자동으로 부여되므로 처리
+            setFragment(); //프래그먼트 생성
         }
     }
 
     protected synchronized void onDestroy() {
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+            tts = null;
+        }
+
         cls.finish();
         super.onDestroy();
     }
@@ -144,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
     }
 
-    public void onRequestPermissionsResult( //2.권한 요청 결과에 따른 콜백 함수
+    public void onRequestPermissionsResult( //권한 요청 결과에 따른 콜백 함수
             int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         /*if(requestCode == PERMISSION_REQUEST_CODE) {
             if(grantResults.length > 0 && allPermissionsGranted(grantResults)) {
@@ -182,38 +194,38 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    protected void setFragment() { //3.액티비티에 프래그먼트 추가
+    protected void setFragment() { //액티비티에 프래그먼트 추가
         Size inputSize = cls.getModelInputSize();
         String cameraId = chooseCamera();
 
         if(inputSize.getWidth() > 0 && inputSize.getHeight() > 0 && !cameraId.isEmpty()) {
             Fragment fragment = CameraFragment.newInstance(
-                    (size, rotation) -> {
+                    (size, rotation) -> { //size를 통해 최적의 카메라 해상도를 구하는 데 기준이 되는 크기를 전달
                         previewWidth = size.getWidth();
                         previewHeight = size.getHeight();
                         sensorOrientation = rotation - getScreenOrientation();
                     },
-                    reader->processImage(reader),
+                    reader->processImage(reader), //이미지 전송
                     inputSize,
                     cameraId);
 
             getFragmentManager().beginTransaction().replace(
                     R.id.fragment, fragment).commit();
         } else {
-            Toast.makeText(this, "Can't find camera", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "카메라를 찾을 수 없습니다.", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private String chooseCamera() { //4.기기에서 적절한 카메라 선택
+    private String chooseCamera() { //기기에서 적절한 카메라를 선택하여 카메라 ID를 반환
         final CameraManager manager =
-                (CameraManager)getSystemService(Context.CAMERA_SERVICE);
+                (CameraManager)getSystemService(Context.CAMERA_SERVICE); //기기에 포함된 카메라의 ID를 얻어옴
         try {
             for (final String cameraId : manager.getCameraIdList()) {
                 final CameraCharacteristics characteristics =
-                        manager.getCameraCharacteristics(cameraId);
+                        manager.getCameraCharacteristics(cameraId); //얻어온 카메라 ID를 통해 해당 카메라의 특성 파악
 
                 final Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) { //후면 카메라를 사용
                     return cameraId;
                 }
             }
@@ -224,20 +236,20 @@ public class MainActivity extends AppCompatActivity {
         return "";
     }
 
-    protected int getScreenOrientation() { //5.화면의 회전 여부를 확인
+    protected int getScreenOrientation() { //기기 회면의 회전 여부를 확인
         switch (getWindowManager().getDefaultDisplay().getRotation()) {
-            case Surface.ROTATION_270:
+            case Surface.ROTATION_270: //회면 회전 값 270도
                 return 270;
-            case Surface.ROTATION_180:
+            case Surface.ROTATION_180: //회면 회전 값 180도
                 return 180;
-            case Surface.ROTATION_90:
+            case Surface.ROTATION_90: //회면 회전 값 90도
                 return 90;
             default:
                 return 0;
         }
     }
 
-    protected void processImage(ImageReader reader) { //6.딥러닝 모델 추론
+    protected synchronized void processImage(ImageReader reader) { //딥러닝 모델 추론
         if (previewWidth == 0 || previewHeight == 0) {
             return;
         }
@@ -246,7 +258,7 @@ public class MainActivity extends AppCompatActivity {
             rgbFrameBitmap = Bitmap.createBitmap(
                     previewWidth,
                     previewHeight,
-                    Bitmap.Config.ARGB_8888);
+                    Bitmap.Config.ARGB_8888); //전달받은 이미지를 ARGB_8888 비트맵으로 변환
         }
 
         if (isProcessingFrame) {
@@ -263,26 +275,28 @@ public class MainActivity extends AppCompatActivity {
 
         YuvToRgbConverter.yuvToRgb(this, image, rgbFrameBitmap);
 
-        runInBackground(() -> {
-            if (cls != null && cls.isInitialized()) {
+        runInBackground(() -> { //모델에 추론 요청
+            if (cls != null && cls.isInitialized()) { //딥러닝 모델 추론은 백그라운드 스레드에서 동작
                 final Pair<String, Float> output = cls.classify(rgbFrameBitmap, sensorOrientation);
 
-                runOnUiThread(() -> {
+                runOnUiThread(() -> { //추론 결과 텍스트뷰 출력은 메인 스레드에서 동작
+
                     String resultStr = String.format(Locale.ENGLISH,
                             "class : %s, prob : %.2f%%",
                             output.first, output.second * 100);
 
-                    String blocksResult = String.format(Locale.ENGLISH, "%s", output.first);
 
                     // 결과 화면 출력
                     textView.setText(resultStr);
-
-                    // 음성 안내 기능
-                    TextToSpeech(blocksResult);
-
-                    //위치 추적 기능
-                    FindLocation(blocksResult);
                 });
+
+                String blocksResult = String.format(Locale.ENGLISH, "%s", output.first);
+
+                // 음성 안내 기능
+                TextToSpeech(blocksResult);
+
+                //위치 찾기 기능
+                FindLocation(blocksResult);
             }
             image.close();
             isProcessingFrame = false;
@@ -290,27 +304,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     protected void TextToSpeech(String blocksResult) { //음성 안내 기능
-        if(blocksResult.equals("0 normal")) {
-            String textOne = "정상 점자블록입니다.";
-            tts.setPitch(1.0f); // 높낮이
-            tts.setSpeechRate(1.0f); // 빠르기
-            tts.speak(textOne, TextToSpeech.QUEUE_FLUSH, null);
+
+        if(blocksResult.equals("0 normal")) { //테스트를 위해 집어넣음
+            String textThree = "정상";
+            tts.setPitch(1.0f); //높낮이
+            tts.setSpeechRate(1.0f); //빠르기
+            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
         }
 
-        if(blocksResult.equals("1 damage")) {
-            String textTwo = "훼손된 점자블록입니다.";
-            tts.setPitch(1.0f); // 높낮이
-            tts.setSpeechRate(1.0f); // 빠르기
-            tts.speak(textTwo, TextToSpeech.QUEUE_FLUSH, null);
+        if(blocksResult.equals("1 damage")) { //테스트를 위해 집어넣음
+            Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE); //진동 신호 기능
+            vibrator.vibrate(300); //0.3초간 진동
+
+            String textThree = "훼손";
+            tts.setPitch(1.0f); //높낮이
+            tts.setSpeechRate(1.0f); //빠르기
+            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
         }
 
         if(blocksResult.equals("2 obstacle")) {
-            String textThree = "앞에 장애물이 있습니다.";
-            tts.setPitch(1.0f); // 높낮이
-            tts.setSpeechRate(1.0f); // 빠르기
+            Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE); //진동 신호 기능
+            vibrator.vibrate(300); //0.3초간 진동
+
+            String textThree = "장애물";
+            tts.setPitch(1.0f); //높낮이
+            tts.setSpeechRate(1.0f); //빠르기
             tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
         }
-    }
+    };
 
     protected void FindLocation(String blocksResult) { //위치 찾기 기능
         if(blocksResult.equals("1 damage")) {
@@ -318,15 +339,6 @@ public class MainActivity extends AppCompatActivity {
                 locationActivity.startLocationUpdates(this);
             }
         }
-    }
-
-    public void onDestory() {
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
-            tts = null;
-        }
-        super.onDestroy();
     }
 
     protected synchronized void runInBackground(final Runnable r) {
