@@ -57,9 +57,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler handler;
 
     private boolean isProcessingFrame = false;
-
     private TextToSpeech tts;
-
     LocationActivity locationActivity = new LocationActivity();
 
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -285,60 +283,38 @@ public class MainActivity extends AppCompatActivity {
                             "class : %s, prob : %.2f%%",
                             output.first, output.second * 100);
 
-
-                    // 결과 화면 출력
-                    textView.setText(resultStr);
+                    textView.setText(resultStr); //결과 화면 출력
                 });
 
                 String blocksResult = String.format(Locale.ENGLISH, "%s", output.first);
 
-                // 음성 안내 기능
-                TextToSpeech(blocksResult);
-
-                //위치 찾기 기능
-                FindLocation(blocksResult);
+                TwoSignal(blocksResult); //음성 안내 & 진동 신호 기능
+                FindLocation(blocksResult, rgbFrameBitmap); //위치 찾기 기능
             }
             image.close();
             isProcessingFrame = false;
         });
     }
 
-    protected void TextToSpeech(String blocksResult) { //음성 안내 기능
-
-        if(blocksResult.equals("0 normal")) { //테스트를 위해 집어넣음
-            String textThree = "정상";
-            tts.setPitch(1.0f); //높낮이
-            tts.setSpeechRate(1.0f); //빠르기
-            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
-        }
-
-        if(blocksResult.equals("1 damage")) { //테스트를 위해 집어넣음
-            Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE); //진동 신호 기능
-            vibrator.vibrate(300); //0.3초간 진동
-
-            String textThree = "훼손";
-            tts.setPitch(1.0f); //높낮이
-            tts.setSpeechRate(1.0f); //빠르기
-            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
-        }
-
+    protected void TwoSignal(String blocksResult) { //음성 안내 & 진동 신호 기능
         if(blocksResult.equals("2 obstacle")) {
             Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE); //진동 신호 기능
             vibrator.vibrate(300); //0.3초간 진동
 
-            String textThree = "장애물";
+            String textThree = "앞에 장애물이 있습니다.";
             tts.setPitch(1.0f); //높낮이
-            tts.setSpeechRate(1.0f); //빠르기
-            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null);
+            tts.setSpeechRate(1.5f); //빠르기
+            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null); //음성 안내 기능
         }
     };
 
-    protected void FindLocation(String blocksResult) { //위치 찾기 기능
+    protected void FindLocation(String blocksResult, Bitmap rgbFrameBitmap) { //위치 찾기 기능
         if(blocksResult.equals("1 damage")) {
             if (locationActivity.checkPermissionForLocation(this)) {
                 locationActivity.startLocationUpdates(this);
             }
         }
+        //rgbFrameBitmap을 DB에 저장
     }
 
     protected synchronized void runInBackground(final Runnable r) {
