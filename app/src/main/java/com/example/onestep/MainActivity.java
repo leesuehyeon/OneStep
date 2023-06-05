@@ -9,6 +9,7 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -22,6 +23,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.Size;
 import android.view.Surface;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String CAMERA_PERMISSION = Manifest.permission.CAMERA;
     private static final int PERMISSION_REQUEST_CODE = 1;
     private static final int REQUEST_PERMISSION_LOCATION = 2;
+    private static final int PERMISSION_CODE = 3;
 
     private TextView textView;
     private Classifier cls;
@@ -93,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // 위치 권한 설정
     private void requestLocationPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // 안드로이드 6.0 이상일 경우 런타임 권한 요청
@@ -100,16 +104,33 @@ public class MainActivity extends AppCompatActivity {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_PERMISSION_LOCATION);
             } else {
                 // 위치 권한이 이미 허용된 경우 처리
-                setFragment();
+                requestStoragePermissions();
+                //setFragment();
             }
         } else {
             // 안드로이드 6.0 미만일 경우 위치 권한이 자동으로 부여되므로 처리
+            requestStoragePermissions();
+            //setFragment();
+        }
+    }
+
+    // 저장소 권한 설정
+    private void requestStoragePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_CODE);
+        } else {
             setFragment();
         }
     }
 
     protected synchronized void onDestroy() {
         cls.finish();
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+            tts = null;
+        }
         super.onDestroy();
     }
 
@@ -163,11 +184,19 @@ public class MainActivity extends AppCompatActivity {
             }
         } else if (requestCode == REQUEST_PERMISSION_LOCATION) {
             if (grantResults.length > 0 && allPermissionsGranted(grantResults)) {
-                // 위치 권한이 허용된 경우 위치 업데이트를 시작
-                setFragment();
+                // 위치 권한이 허용된 경우 저장소 접근 권한을 요청
+                requestStoragePermissions();
             } else {
                 // 위치 권한이 거부된 경우 처리
                 Toast.makeText(this, "위치 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == PERMISSION_CODE) {
+            if (grantResults.length > 0 && allPermissionsGranted(grantResults)) {
+                // 저장소 접근 권한이 허용된 경우 시작
+                setFragment();
+            } else {
+                // 저장소 접근 권한이 거부된 경우 처리
+                Toast.makeText(this, "저장소 접근 권한이 필요합니다.", Toast.LENGTH_SHORT).show();
             }
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -280,8 +309,8 @@ public class MainActivity extends AppCompatActivity {
                     // 음성 안내 기능
                     TextToSpeech(blocksResult);
 
-                    //위치 추적 기능
-                    FindLocation(blocksResult);
+                    // 위치 추적 및 사진 전송기능
+                    FindLocation(blocksResult, rgbFrameBitmap);
                 });
             }
             image.close();
@@ -312,21 +341,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    protected void FindLocation(String blocksResult) { //위치 찾기 기능
+    protected void FindLocation(String blocksResult, Bitmap rgbFrameBitmap) { //위치 찾기 기능
         if(blocksResult.equals("1 damage")) {
             if (locationActivity.checkPermissionForLocation(this)) {
-                locationActivity.startLocationUpdates(this);
+                if (locationActivity.checkPermissionForStorage(this)) {
+                    locationActivity.startLocationUpdates(this, rgbFrameBitmap);
+                }
             }
         }
-    }
-
-    public void onDestory() {
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
-            tts = null;
-        }
-        super.onDestroy();
     }
 
     protected synchronized void runInBackground(final Runnable r) {
