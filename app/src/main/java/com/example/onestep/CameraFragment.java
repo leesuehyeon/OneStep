@@ -18,6 +18,7 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -37,6 +38,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -62,10 +65,11 @@ public class CameraFragment extends Fragment {
     private ImageReader previewReader;
     private CameraCaptureSession captureSession;
 
-    private CameraFragment(final ConnectionCallback callback, //1.프래그먼트 생성 및 연결
-                           final ImageReader.OnImageAvailableListener imageAvailableListener,
-                           final Size inputSize,
-                           final String cameraId) {
+    //프래그먼트 생성 및 연결
+    private CameraFragment(final ConnectionCallback callback, //카메라 연결 시 호출
+                           final ImageReader.OnImageAvailableListener imageAvailableListener, //카메라의 다음 프레임 이미지 준비 시 호출
+                           final Size inputSize, //모델 입력 이미지의 가로세로 크기
+                           final String cameraId) { //사용할 카메라 ID
         this.connectionCallback = callback;
         this.imageAvailableListener = imageAvailableListener;
         this.inputSize = inputSize;
@@ -80,40 +84,39 @@ public class CameraFragment extends Fragment {
         return new CameraFragment(callback, imageAvailableListener, inputSize, cameraId);
     }
 
-    //4.UI 구성 함수
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, //프래그먼트의 View를 객체화
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_camera, container, false);
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) { //View 생성이 완료되면 호출
         autoFitTextureView = view.findViewById(R.id.autoFitTextureView);
     }
 
-    public void onResume() { //5.카메라 연결 시작
+    public void onResume() { //카메라 연결 요청
         super.onResume();
-        startBackgroundThread(); //18.백그라운드 스레드 시작
+        startBackgroundThread();
 
         if(!autoFitTextureView.isAvailable())
-            autoFitTextureView.setSurfaceTextureListener(surfaceTextureListener);
+            autoFitTextureView.setSurfaceTextureListener(surfaceTextureListener); //카메라가 연속적으로 생성하는 이미지 스트림을 받아옴
         else
             openCamera(autoFitTextureView.getWidth(), autoFitTextureView.getHeight());
     }
 
-    public void onPause() { //16.카메라 연결 해제
+    public void onPause() { //카메라 연결 해제
         closeCamera();
-        stopBackgroundThread(); //20.백그라운드 스레드 종료 호출
+        stopBackgroundThread(); //백그라운드 스레드 종료 호출
         super.onPause();
     }
 
-    private void startBackgroundThread() { //17.백그라운드 스레드 생성
+    private void startBackgroundThread() { //백그라운드 스레드 생성
         backgroundThread = new HandlerThread("ImageListener");
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
     }
 
-    private void stopBackgroundThread() { //19.백그라운드 스레드 종료
+    private void stopBackgroundThread() { //백그라운드 스레드 종료
         backgroundThread.quitSafely();
         try {
             backgroundThread.join();
@@ -124,16 +127,16 @@ public class CameraFragment extends Fragment {
         }
     }
 
-    private final TextureView.SurfaceTextureListener surfaceTextureListener = //6.surface Texture 호출
+    private final TextureView.SurfaceTextureListener surfaceTextureListener = //surface Texture 호출
             new TextureView.SurfaceTextureListener() {
                 @Override
                 public void onSurfaceTextureAvailable(
                         final SurfaceTexture texture, final int width, final int height) {
-                    openCamera(width, height);
+                    openCamera(width, height); //카메라 호출
                 }
 
                 @Override
-                public void onSurfaceTextureSizeChanged(
+                public void onSurfaceTextureSizeChanged( //버퍼 크기가 변경될 때 호출
                         final SurfaceTexture texture, final int width, final int height) {
                     configureTransform(width, height);
                 }
@@ -144,12 +147,12 @@ public class CameraFragment extends Fragment {
                 }
 
                 @Override
-                public void onSurfaceTextureUpdated(final SurfaceTexture texture) {
+                public void onSurfaceTextureUpdated(final SurfaceTexture texture) { //이미지가 업데이트 되었을 때 호출
                 }
             };
 
-    @SuppressLint("MissingPermission") //7.카메라 연결
-    private void openCamera(final int width, final int height) {
+    @SuppressLint("MissingPermission")
+    private void openCamera(final int width, final int height) { //카메라 연결
         final Activity activity = getActivity();
         final CameraManager manager =
                 (CameraManager)activity.getSystemService(Context.CAMERA_SERVICE);
@@ -157,11 +160,13 @@ public class CameraFragment extends Fragment {
         setupCameraOutputs(manager);
         configureTransform(width, height);
 
-        try {
+        try { //2,500밀리초가 지나도 카메라를 연결할 수 없다면 액티비티 종료
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                Toast.makeText(getContext(),
-                        "Time out waiting to lock camera opening.",
-                        Toast.LENGTH_LONG).show();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Toast.makeText(getContext(),
+                            "Time out waiting to lock camera opening.",
+                            Toast.LENGTH_LONG).show();
+                }
                 activity.finish();
             } else {
                 manager.openCamera(cameraId, stateCallback, backgroundHandler);
@@ -171,7 +176,7 @@ public class CameraFragment extends Fragment {
         }
     }
 
-    private void setupCameraOutputs(CameraManager manager) { //8.카메라 출력 크기와 방향 설정
+    private void setupCameraOutputs(CameraManager manager) { //카메라 출력 크기와 방향 설정
         try {
             final CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
 
@@ -198,7 +203,7 @@ public class CameraFragment extends Fragment {
         connectionCallback.onPreviewSizeChosen(previewSize, sensorOrientation);
     }
 
-    private void configureTransform(final int viewWidth, final int viewHeight) { //11.가로세로 크기가 변경되면 호출
+    private void configureTransform(final int viewWidth, final int viewHeight) { //가로세로 크기가 변경되면 호출
         final Activity activity = getActivity();
         if (null == autoFitTextureView || null == previewSize || null == activity) {
             return;
@@ -227,12 +232,12 @@ public class CameraFragment extends Fragment {
         autoFitTextureView.setTransform(matrix);
     }
 
-    protected Size chooseOptimalSize(final Size[] choices, final int width, final int height) { //9.최적의 카메라 출력 크기 계산
+    protected Size chooseOptimalSize(final Size[] choices, final int width, final int height) { //최적의 카메라 출력 크기 계산
         final int minSize = Math.min(width, height);
         final Size desiredSize = new Size(width, height);
 
-        final List<Size> bigEnough = new ArrayList<Size>();
-        final List<Size> tooSmall = new ArrayList<Size>();
+        final List<Size> bigEnough = new ArrayList<Size>(); //카메라가 지원하는 출력 크기 배열에 전달받은 가장 큰 사이즈
+        final List<Size> tooSmall = new ArrayList<Size>(); //카메라가 지원하는 출력 크기 배열에 전달받은 가장 작은 사이즈
         for (final Size option : choices) {
             if (option.equals(desiredSize)) {
                 return desiredSize;
@@ -252,12 +257,12 @@ public class CameraFragment extends Fragment {
         }
     }
 
-    private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() { //12.캡쳐 세션 생성
+    private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() { //카메라 캡쳐 세션 생성
         @Override
         public void onOpened(final CameraDevice cd) {
             cameraOpenCloseLock.release();
             cameraDevice = cd;
-            createCameraPreviewSession();
+            createCameraPreviewSession(); //카메라 미리보기 세션 생성
         }
 
         @Override
@@ -279,7 +284,7 @@ public class CameraFragment extends Fragment {
         }
     };
 
-    private void createCameraPreviewSession() { //13.미리보기 세션 생성
+    private void createCameraPreviewSession() { //카메라 미리보기 세션 생성
         try {
             final SurfaceTexture texture = autoFitTextureView.getSurfaceTexture();
             texture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
@@ -303,10 +308,6 @@ public class CameraFragment extends Fragment {
                     CaptureRequest.CONTROL_AE_MODE,
                     CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
 
-//            previewRequestBuilder.set(
-//                    CaptureRequest.FLASH_MODE,
-//                    CameraMetadata.FLASH_MODE_TORCH);
-
             cameraDevice.createCaptureSession(
                     Arrays.asList(surface, previewReader.getSurface()),
                     sessionStateCallback, null);
@@ -315,7 +316,7 @@ public class CameraFragment extends Fragment {
         }
     }
 
-    private final CameraCaptureSession.StateCallback sessionStateCallback = //14.카메라 캡쳐 세션의 상태 콜백 함수
+    private final CameraCaptureSession.StateCallback sessionStateCallback =
             new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(final CameraCaptureSession cameraCaptureSession) {
@@ -358,11 +359,12 @@ public class CameraFragment extends Fragment {
             cameraOpenCloseLock.release();
         }
     }
-    public interface ConnectionCallback { //2.콜백 함수 정의
-        void onPreviewSizeChosen(Size size, int cameraRotation);
+
+    public interface ConnectionCallback { //카메라 이미지의 가로세로 크기와 이미지 회전 여부를 전달
+        void onPreviewSizeChosen(Size size, int cameraRotation); //가로세로 크기가 확정되었을 때 호출
     }
 
-    static class CompareSizesByArea implements Comparator<Size> { //10.넓이를 기준으로 사이즈 비교
+    static class CompareSizesByArea implements Comparator<Size> { //넓이를 기준으로 사이즈 비교
         @Override
         public int compare(final Size lhs, final Size rhs) {
             return Long.signum(

@@ -5,6 +5,7 @@
     android:layout_height="match_parent"
     tools:context="CameraFragment">
 
+<!--    카메라 실시간 전달 이미지 출력-->
     <com.example.onestep.AutoFitTextureView
         android:id="@+id/autoFitTextureView"
         android:layout_width="wrap_content"

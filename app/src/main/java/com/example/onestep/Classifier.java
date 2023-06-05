@@ -23,6 +23,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Handler;
 
 public class Classifier {
     private static final String MODEL_NAME = "model_unquant.tflite";
@@ -41,7 +45,7 @@ public class Classifier {
         this.context = context;
     }
 
-    public void init() throws IOException { //3.모델의 입력 크기 반환
+    public void init() throws IOException { //모델의 입력 크기 반환
         model = Model.createModel(context, MODEL_NAME);
 
         initModelShape();
@@ -58,6 +62,7 @@ public class Classifier {
 
     private void initModelShape() {
         Tensor inputTensor = model.getInputTensor(0);
+
         int[] shape = inputTensor.shape();
         modelInputChannel = shape[0];
         modelInputWidth = shape[1];
@@ -69,7 +74,7 @@ public class Classifier {
         outputBuffer = TensorBuffer.createFixedSize(outputTensor.shape(), outputTensor.dataType());
     }
 
-    public Size getModelInputSize() {
+    public Size getModelInputSize() { //모델의 입력 이미지 크기를 구함
         if(!isInitialized)
             return new Size(0, 0);
         return new Size(modelInputWidth, modelInputHeight);
@@ -79,7 +84,7 @@ public class Classifier {
         return bitmap.copy(Bitmap.Config.ARGB_8888,true);
     }
 
-    private TensorImage loadImage(final Bitmap bitmap, int sensorOrientation) { //4.이미지 회전 고려
+    private TensorImage loadImage(final Bitmap bitmap, int sensorOrientation) { //이미지 회전 고려
         if(bitmap.getConfig() != Bitmap.Config.ARGB_8888) {
             inputImage.load(convertBitmapToARGB8888(bitmap));
         } else {
@@ -99,14 +104,21 @@ public class Classifier {
         return imageProcessor.process(inputImage);
     }
 
-    public Pair<String, Float> classify(Bitmap image, int sensorOrientation) {
+    public synchronized Pair<String, Float> classify(Bitmap image, int sensorOrientation) { //String: 클래스 명, Float: 모델 추론 결과
+
         inputImage = loadImage(image, sensorOrientation);
 
         Object[] inputs = new Object[]{inputImage.getBuffer()};
         Map<Integer, Object> outputs = new HashMap();
         outputs.put(0, outputBuffer.getBuffer().rewind());
 
-        model.run(inputs, outputs);
+        model.run(inputs, outputs); //모델 추론 시작
+
+        try {
+            Thread.sleep(5000); //5초 지연
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         Map<String, Float> output =
                 new TensorLabel(labels, outputBuffer).getMapWithFloatValue();
@@ -114,7 +126,7 @@ public class Classifier {
         return argmax(output);
     }
 
-    public Pair<String, Float> classify(Bitmap image) {
+    public Pair<String, Float> classify(Bitmap image) { //String: 클래스 명, Float: 모델 추론 결과
         return classify(image, 0);
     }
 

@@ -13,6 +13,9 @@
     <!--음성 권한 추가-->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!--진동 권한 추가-->
+    <uses-permission android:name = "android.permission.VIBRATE" />
+
     <!--위치 권한 추가-->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -27,6 +30,7 @@
     <application
         android:usesCleartextTraffic="true"
         android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"

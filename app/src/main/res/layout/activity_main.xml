@@ -7,20 +7,22 @@
     android:layout_height="match_parent"
     tools:context=".LocationActivity">
 
+<!--    카메라 입력 이미지-->
     <FrameLayout
         android:id="@+id/fragment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:layout_constraintTop_toTopOf="parent" />
 
+<!--    모델 추론 결과 출력-->
     <TextView
         android:id="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Result"
         app:layout_constraintTop_toBottomOf="@id/fragment"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent" />
+        app:layout_constraintRight_toRightOf="parent"
+        android:text="Result" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

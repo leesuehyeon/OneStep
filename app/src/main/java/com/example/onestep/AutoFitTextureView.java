@@ -25,11 +25,12 @@ public class AutoFitTextureView extends TextureView {
         if (width < 0 || height < 0) {
             throw new IllegalArgumentException("Size cannot be negative.");
         }
-        ratioWidth = width;
+        ratioWidth = width; //이미지의 가로세로 값을 전달받아 ratioWidth, ratioHeight 변수에 저장
         ratioHeight = height;
         requestLayout();
     }
 
+    //setAspectRatio에서 지정한 이미지 가로세로 비율과 텍스트뷰 가로세로 비율을 맞추도록 구현
     @Override
     protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);

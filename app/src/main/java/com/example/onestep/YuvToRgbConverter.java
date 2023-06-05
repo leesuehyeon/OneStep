@@ -13,7 +13,7 @@ import android.renderscript.Type;
 
 import java.nio.ByteBuffer;
 
-public class YuvToRgbConverter {
+public class YuvToRgbConverter { //YUV 포멧의 이미지를 ARGB_8888 포맷의 비트맵으로 변환
 
     public static void yuvToRgb(Context context, Image image, Bitmap output) {
         RenderScript rs = RenderScript.create(context);
