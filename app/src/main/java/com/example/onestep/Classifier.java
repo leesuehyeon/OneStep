@@ -114,12 +114,6 @@ public class Classifier {
 
         model.run(inputs, outputs); //모델 추론 시작
 
-        try {
-            Thread.sleep(5000); //5초 지연
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
         Map<String, Float> output =
                 new TensorLabel(labels, outputBuffer).getMapWithFloatValue();
 

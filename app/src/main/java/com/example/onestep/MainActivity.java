@@ -328,8 +328,14 @@ public class MainActivity extends AppCompatActivity {
 
             String textThree = "앞에 장애물이 있습니다.";
             tts.setPitch(1.0f); //높낮이
-            tts.setSpeechRate(1.5f); //빠르기
+            tts.setSpeechRate(1.0f); //빠르기
             tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null); //음성 안내 기능
+
+            try {
+                Thread.sleep(3000); //3초 지연
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
     };
 

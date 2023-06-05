@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="CameraFragment">
+    android:layout_height="match_parent" >
 
 <!--    카메라 실시간 전달 이미지 출력-->
     <com.example.onestep.AutoFitTextureView
         android:id="@+id/autoFitTextureView"
-        android:layout_width="wrap_content"
+        android:layout_width="600dp"
         android:layout_height="wrap_content" />
 
 </FrameLayout>
