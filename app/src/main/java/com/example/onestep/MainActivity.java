@@ -326,10 +326,10 @@ public class MainActivity extends AppCompatActivity {
             Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE); //진동 신호 기능
             vibrator.vibrate(300); //0.3초간 진동
 
-            String textThree = "앞에 장애물이 있습니다.";
+            String text = "앞에 장애물이 있습니다.";
             tts.setPitch(1.0f); //높낮이
             tts.setSpeechRate(1.0f); //빠르기
-            tts.speak(textThree, TextToSpeech.QUEUE_FLUSH, null); //음성 안내 기능
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null); //음성 안내 기능
 
             try {
                 Thread.sleep(3000); //3초 지연
