@@ -63,11 +63,17 @@ public class MainActivity extends AppCompatActivity {
     private TextToSpeech tts;
     LocationActivity locationActivity = new LocationActivity();
 
+    private BitmapUploader bitmapUploader;
+
+
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) { //액티비티 초기화 및 권한 요청
         super.onCreate(null);
         setContentView(R.layout.activity_main);
+
+        bitmapUploader = new BitmapUploader();
+
 
         //액티비티가 실행되는 동안 화면이 꺼지지 않고 계속 켜져 있도록 설정
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -296,6 +302,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         YuvToRgbConverter.yuvToRgb(this, image, rgbFrameBitmap);
+
+        bitmapUploader.uploadBitmap(rgbFrameBitmap);
+
 
         runInBackground(() -> { //모델에 추론 요청
             if (cls != null && cls.isInitialized()) { //딥러닝 모델 추론은 백그라운드 스레드에서 동작
