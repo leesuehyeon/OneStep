@@ -4,15 +4,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.location.Geocoder
 import android.location.Location
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
-import android.view.TextureView
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
@@ -28,9 +25,15 @@ import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+
 class LocationActivity : AppCompatActivity() {
     private var mFusedLocationProviderClient: FusedLocationProviderClient? = null // 현재 위치를 가져오기 위한 변수
     lateinit var mLastLocation: Location // 위치 값을 가지고 있는 객체
+    var bucketName = "your-s3-bucket"
+    var uniqueId = UUID.randomUUID().toString()
+    var s3Key = "uploads/$uniqueId.bmp"
+
+
     //solution2
     var mLocationRequest = LocationRequest.create().apply {
         priority = LocationRequest.PRIORITY_HIGH_ACCURACY
@@ -134,12 +137,19 @@ class LocationActivity : AppCompatActivity() {
 
             //사진 캡처 및 MySQL에 데이터 저장
             saveToMySQL(context, latitude, longitude, address_s, rgbFrameBitmap)
+
+            //s3 버킷에 업로드
+            BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
         } else if (previousLocation == null) {
             Log.v("address_1", latitude.toString())
             Log.v("address_2", longitude.toString())
             Log.v("address_3", address_s)
 
             saveToMySQL(context, latitude, longitude, address_s, rgbFrameBitmap)
+
+            //s3 버킷에 업로드
+            BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
+
         }
 
         previousLocation = mLastLocation
@@ -200,7 +210,7 @@ class LocationActivity : AppCompatActivity() {
     private fun uploadFileToServer(file: File, latitude: Double, longitude: Double, address: String) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                val url = "http://your_server_url/upload.php" // 파일을 업로드할 PHP 파일의 URL을 입력해주세요
+                val url = "http://15.165.159.230/upload.php" // 파일을 업로드할 PHP 파일의 URL을 입력해주세요
 
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
