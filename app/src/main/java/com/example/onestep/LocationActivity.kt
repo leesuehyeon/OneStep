@@ -10,8 +10,17 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferNetworkLossHandler
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferObserver
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferState
+import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility
+import com.amazonaws.services.s3.AmazonS3Client
 import com.google.android.gms.location.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -21,17 +30,20 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.Regions;
 import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
 
+
+
 class LocationActivity : AppCompatActivity() {
     private var mFusedLocationProviderClient: FusedLocationProviderClient? = null // 현재 위치를 가져오기 위한 변수
     lateinit var mLastLocation: Location // 위치 값을 가지고 있는 객체
-    var bucketName = "your-s3-bucket"
-    var uniqueId = UUID.randomUUID().toString()
-    var s3Key = "uploads/$uniqueId.bmp"
+    var bucketName = "onesteps3"
+    var s3Key = ""
 
 
     //solution2
@@ -139,7 +151,7 @@ class LocationActivity : AppCompatActivity() {
             saveToMySQL(context, latitude, longitude, address_s, rgbFrameBitmap)
 
             //s3 버킷에 업로드
-            BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
+           BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
         } else if (previousLocation == null) {
             Log.v("address_1", latitude.toString())
             Log.v("address_2", longitude.toString())
@@ -196,13 +208,16 @@ class LocationActivity : AppCompatActivity() {
 
     private fun saveScreenshot(context: Context, screenshot: Bitmap): File {
         val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "screenshot_$timeStamp.png"
+        val fileName = "screenshot_$timeStamp.png" //파일 네임. uploads/그거 .bmp 그거
 
         val file = File(context.externalCacheDir, fileName)
         val fileOutputStream = FileOutputStream(file)
         screenshot.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
         fileOutputStream.flush()
         fileOutputStream.close()
+
+
+        s3Key = fileName
 
         return file
     }
@@ -252,4 +267,9 @@ class LocationActivity : AppCompatActivity() {
 
     }
 
+
+
+
 }
+
+

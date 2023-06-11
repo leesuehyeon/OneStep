@@ -30,6 +30,7 @@ public class BitmapUploader {
             byte[] bitmapData = outputStream.toByteArray();
 
             // S3 버킷에 파일 업로드
+            //s3 객체로 버킷과 상호작용
             PutObjectRequest objRequest = PutObjectRequest.builder().bucket(bucketName).key(s3Key).build();
             s3.putObject(objRequest, RequestBody.fromBytes(bitmapData));
 
