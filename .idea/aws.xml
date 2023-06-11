@@ -2,7 +2,11 @@
 <project version="4">
   <component name="accountSettings">
     <option name="activeProfile" value="profile:onestepaccess" />
+<<<<<<< HEAD
     <option name="activeRegion" value="ap-northeast-2" />
+=======
+    <option name="activeRegion" value="us-east-2" />
+>>>>>>> origin/master
     <option name="recentlyUsedProfiles">
       <list>
         <option value="profile:onestepaccess" />
@@ -10,8 +14,13 @@
     </option>
     <option name="recentlyUsedRegions">
       <list>
+<<<<<<< HEAD
         <option value="ap-northeast-2" />
         <option value="us-east-2" />
+=======
+        <option value="us-east-2" />
+        <option value="ap-northeast-2" />
+>>>>>>> origin/master
         <option value="us-east-1" />
       </list>
     </option>
