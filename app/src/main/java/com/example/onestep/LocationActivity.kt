@@ -10,18 +10,13 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.amazonaws.auth.AWSCredentials
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferNetworkLossHandler
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferObserver
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferState
-import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility
-import com.amazonaws.services.s3.AmazonS3Client
-import com.google.android.gms.location.*
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -30,13 +25,18 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.Regions;
-import java.io.*
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
-import java.util.*
-
-
+import java.util.Date
+import java.util.Locale
 
 
 class LocationActivity : AppCompatActivity() {
@@ -143,25 +143,17 @@ class LocationActivity : AppCompatActivity() {
         val address_s = address.toString()
 
         if (previousLocation != null && locationThreshold(previousLocation!!, mLastLocation)) {
-            Log.v("address_4", latitude.toString())
-            Log.v("address_5", longitude.toString())
-            Log.v("address_6", address_s)
-
-            //사진 캡처 및 MySQL에 데이터 저장
-            saveToMySQL(context, latitude, longitude, address_s, rgbFrameBitmap)
+            //MySQL에 데이터 저장
+            saveToMySQL(context, latitude, longitude, address_s, s3Key)
 
             //s3 버킷에 업로드
-           BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
+            bitmapUploadToS3(rgbFrameBitmap, bucketName, s3Key)
         } else if (previousLocation == null) {
-            Log.v("address_1", latitude.toString())
-            Log.v("address_2", longitude.toString())
-            Log.v("address_3", address_s)
-
-            saveToMySQL(context, latitude, longitude, address_s, rgbFrameBitmap)
+            //MySQL에 데이터 저장
+            saveToMySQL(context, latitude, longitude, address_s, s3Key)
 
             //s3 버킷에 업로드
-            BitmapUploader.bitmapUploadToS3(rgbFrameBitmap,bucketName, s3Key)
-
+            bitmapUploadToS3(rgbFrameBitmap, bucketName, s3Key)
         }
 
         previousLocation = mLastLocation
@@ -216,20 +208,19 @@ class LocationActivity : AppCompatActivity() {
         fileOutputStream.flush()
         fileOutputStream.close()
 
-
         s3Key = fileName
 
         return file
     }
 
-    private fun uploadFileToServer(file: File, latitude: Double, longitude: Double, address: String) {
+    private fun uploadFileToServer(filepath: String, latitude: Double, longitude: Double, address: String) {
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 val url = "http://15.165.159.230/upload.php" // 파일을 업로드할 PHP 파일의 URL을 입력해주세요
 
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart("file", file.name, file.asRequestBody("image/*".toMediaTypeOrNull()))
+                    .addFormDataPart("file", s3Key)
                     .addFormDataPart("latitude", latitude.toString())
                     .addFormDataPart("longitude", longitude.toString())
                     .addFormDataPart("address", address)
@@ -259,17 +250,38 @@ class LocationActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveToMySQL(context: Context, latitude: Double, longitude: Double, address: String, rgbFrameBitmap: Bitmap) {
-        val file: File = saveScreenshot(context, rgbFrameBitmap)
-        if (file.exists()) {
-            uploadFileToServer(file, latitude, longitude, address)
-        }
-
+    private fun saveToMySQL(context: Context, latitude: Double, longitude: Double, address: String, rgbFrame: String) {
+        uploadFileToServer(rgbFrame, latitude, longitude, address)
     }
 
 
+    fun bitmapUploadToS3(bitmap: Bitmap, bucketName: String, s3Key: String) {
 
+        val ACCESS_KEY = "AKIA35AVS5GOGWSALY6F"
+        val SECRET_KEY = "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"
 
+        // AWS 자격 증명 및 지역 설정
+        val credentials =
+            AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)
+        val region = software.amazon.awssdk.regions.Region.AP_NORTHEAST_2 // 서울
+        val s3 = S3Client.builder().region(region)
+            .credentialsProvider(StaticCredentialsProvider.create(credentials)).build()
+        try {
+            // 비트맵을 바이트 배열로 전환
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            val bitmapData = outputStream.toByteArray()
+
+            // S3 버킷에 파일 업로드
+            // S3 객체로 버킷과 상호작용
+            val objRequest = PutObjectRequest.builder().bucket(bucketName).key(s3Key).build()
+            s3.putObject(objRequest, RequestBody.fromBytes(bitmapData))
+            Log.d(
+                "BitmapUploader",
+                "비트맵 파일을 S3 버킷 " + bucketName + "의 " + s3Key + "에 성공적으로 업로드 하였습니다."
+            )
+        } catch (e: S3Exception) {
+            Log.e("BitmapUploader", "파일 업로드 중 오류가 발생했습니다: " + e.awsErrorDetails().errorMessage())
+        }
+    }
 }
-
-
