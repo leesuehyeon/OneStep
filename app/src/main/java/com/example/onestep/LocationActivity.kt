@@ -34,6 +34,9 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.PreparedStatement
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,7 +46,7 @@ class LocationActivity : AppCompatActivity() {
     private var mFusedLocationProviderClient: FusedLocationProviderClient? = null // 현재 위치를 가져오기 위한 변수
     lateinit var mLastLocation: Location // 위치 값을 가지고 있는 객체
     var bucketName = "onesteps3"
-    var s3Key = ""
+    var s3Key : String? = null
 
 
     //solution2
@@ -143,17 +146,36 @@ class LocationActivity : AppCompatActivity() {
         val address_s = address.toString()
 
         if (previousLocation != null && locationThreshold(previousLocation!!, mLastLocation)) {
-            //MySQL에 데이터 저장
-            saveToMySQL(context, latitude, longitude, address_s, s3Key)
+            val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "screenshot_$timeStamp.png" //파일 이름
+            s3Key = fileName
 
-            //s3 버킷에 업로드
-            bitmapUploadToS3(rgbFrameBitmap, bucketName, s3Key)
+            //s3Key가 null이 아닌 경우에만 실행
+            s3Key?.let {
+                bitmapUploadToS3(rgbFrameBitmap, bucketName, it)
+                //MySQL에 데이터 저장
+                //saveToMySQL(latitude, longitude, address_s, it)
+
+                val s3ImagePath = "s3://$bucketName/$it" //이미지 전체 경로
+                //RDS에 데이터 저장
+                saveImageDataToRDS(s3ImagePath, latitude, longitude, address_s)
+            }
+
         } else if (previousLocation == null) {
-            //MySQL에 데이터 저장
-            saveToMySQL(context, latitude, longitude, address_s, s3Key)
+            val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "screenshot_$timeStamp.png" //파일 이름
+            s3Key = fileName
 
-            //s3 버킷에 업로드
-            bitmapUploadToS3(rgbFrameBitmap, bucketName, s3Key)
+            //s3Key가 null이 아닌 경우에만 실행
+            s3Key?.let {
+                bitmapUploadToS3(rgbFrameBitmap, bucketName, it)
+                //MySQL에 데이터 저장
+                //saveToMySQL(latitude, longitude, address_s, it)
+
+                val s3ImagePath = "s3://$bucketName/$it" //이미지 전체 경로
+                //RDS에 데이터 저장
+                saveImageDataToRDS(s3ImagePath, latitude, longitude, address_s)
+            }
         }
 
         previousLocation = mLastLocation
@@ -198,7 +220,7 @@ class LocationActivity : AppCompatActivity() {
         return screenshot
     }*/
 
-    private fun saveScreenshot(context: Context, screenshot: Bitmap): File {
+    /*private fun saveScreenshot(context: Context, screenshot: Bitmap): File {
         val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "screenshot_$timeStamp.png" //파일 네임. uploads/그거 .bmp 그거
 
@@ -211,7 +233,7 @@ class LocationActivity : AppCompatActivity() {
         s3Key = fileName
 
         return file
-    }
+    }*/
 
     private fun uploadFileToServer(filepath: String, latitude: Double, longitude: Double, address: String) {
         GlobalScope.launch(Dispatchers.IO) {
@@ -220,7 +242,7 @@ class LocationActivity : AppCompatActivity() {
 
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart("file", s3Key)
+                    .addFormDataPart("file", filepath)
                     .addFormDataPart("latitude", latitude.toString())
                     .addFormDataPart("longitude", longitude.toString())
                     .addFormDataPart("address", address)
@@ -250,13 +272,12 @@ class LocationActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveToMySQL(context: Context, latitude: Double, longitude: Double, address: String, rgbFrame: String) {
-        uploadFileToServer(rgbFrame, latitude, longitude, address)
+    private fun saveToMySQL(latitude: Double, longitude: Double, address: String, filepath: String) {
+        uploadFileToServer(filepath, latitude, longitude, address)
     }
 
 
     fun bitmapUploadToS3(bitmap: Bitmap, bucketName: String, s3Key: String) {
-
         val ACCESS_KEY = "AKIA35AVS5GOGWSALY6F"
         val SECRET_KEY = "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"
 
@@ -282,6 +303,35 @@ class LocationActivity : AppCompatActivity() {
             )
         } catch (e: S3Exception) {
             Log.e("BitmapUploader", "파일 업로드 중 오류가 발생했습니다: " + e.awsErrorDetails().errorMessage())
+        }
+    }
+
+    // RDS 데이터베이스 정보 저장 함수
+    fun saveImageDataToRDS(imagePath: String, latitude: Double, longitude: Double, address: String) {
+        GlobalScope.launch(Dispatchers.IO) {
+            val url = "jdbc:mysql://YOUR_RDS_ENDPOINT:3306/YOUR_DATABASE_NAME"
+            val username = "YOUR_USERNAME"
+            val password = "YOUR_PASSWORD"
+
+            // RDS에 연결
+            val connection: Connection = DriverManager.getConnection(url, username, password)
+
+            // INSERT 쿼리 준비
+            val query = "INSERT INTO YOUR_TABLE_NAME (latitude, longitude, address, image_path) VALUES (?, ?, ?, ?)"
+            val statement: PreparedStatement = connection.prepareStatement(query)
+
+            // 파라미터 설정
+            statement.setDouble(1, latitude)
+            statement.setDouble(2, longitude)
+            statement.setString(3, address)
+            statement.setString(4, imagePath)
+
+            // 쿼리 실행
+            statement.executeUpdate()
+
+            // 연결 및 리소스 해제
+            statement.close()
+            connection.close()
         }
     }
 }
