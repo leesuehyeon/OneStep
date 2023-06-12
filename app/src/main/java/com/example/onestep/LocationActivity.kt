@@ -37,6 +37,7 @@ import java.io.FileOutputStream
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
+import java.sql.Statement
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -309,15 +310,16 @@ class LocationActivity : AppCompatActivity() {
     // RDS 데이터베이스 정보 저장 함수
     fun saveImageDataToRDS(imagePath: String, latitude: Double, longitude: Double, address: String) {
         GlobalScope.launch(Dispatchers.IO) {
-            val url = "jdbc:mysql://YOUR_RDS_ENDPOINT:3306/YOUR_DATABASE_NAME"
-            val username = "YOUR_USERNAME"
-            val password = "YOUR_PASSWORD"
+            val url = "jdbc:mysql://databases.cwk22ntmvr0f.ap-northeast-2.rds.amazonaws.com:3306/onestepIntent"
+            val username = "admin"
+            val password = "onestepadmin"
 
             // RDS에 연결
+            Class.forName("com.mysql.jdbc.Driver")
             val connection: Connection = DriverManager.getConnection(url, username, password)
 
             // INSERT 쿼리 준비
-            val query = "INSERT INTO YOUR_TABLE_NAME (latitude, longitude, address, image_path) VALUES (?, ?, ?, ?)"
+            val query = "INSERT INTO AccidentBlock (latitude, longitude, address, image_path) VALUES (?, ?, ?, ?)"
             val statement: PreparedStatement = connection.prepareStatement(query)
 
             // 파라미터 설정
@@ -326,7 +328,7 @@ class LocationActivity : AppCompatActivity() {
             statement.setString(3, address)
             statement.setString(4, imagePath)
 
-            // 쿼리 실행
+             //쿼리 실행
             statement.executeUpdate()
 
             // 연결 및 리소스 해제
